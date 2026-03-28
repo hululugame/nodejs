@@ -8,16 +8,9 @@ const ADMIN_ID = "8345305737";
 
 const userState = {};
 
-// 首頁測試
 app.get("/", (req, res) => {
   res.send("Bot is running");
 });
-
-// 抓目前點數
-function extractPoints(text) {
-  const match = text.match(/目前點數[:：]\s*(\d+)/);
-  return match ? parseInt(match[1]) : 0;
-}
 
 app.post("/webhook", async (req, res) => {
   try {
@@ -73,35 +66,31 @@ app.post("/webhook", async (req, res) => {
       replyText = "請輸入會員手機";
     }
 
-    // ===== 查詢會員 =====
+    // ===== 查詢 =====
     else if (userState[chatId]?.action === "CHECK") {
 
       const response = await fetch(`${GAS_URL}?action=check&phone=${text}`);
-      const result = (await response.text()).trim();
-
-      if (
-        result.includes("目前點數：0") &&
-        result.includes("無紀錄")
-      ) {
-        replyText = "查無此會員";
-      } else {
-        replyText = result;
-      }
+      replyText = await response.text();
 
       userState[chatId] = null;
     }
 
-    // ===== 產生序號 =====
+    // ===== 產生序號（修正重複問題）=====
     else if (userState[chatId]?.action === "GENERATE") {
 
       if (!/^\d+$/.test(text)) {
         replyText = "請輸入數字";
       } else {
+
         const response = await fetch(
           `${GAS_URL}?action=generate&points=${text}&password=az20408`
         );
-        const code = await response.text();
-        replyText = `序號：${code}\n\n\`${code}\``;
+
+        const result = await response.text();
+
+        replyText =
+          `可複製序號👇\n\n` +
+          `${result}`;
       }
 
       userState[chatId] = null;
@@ -137,26 +126,16 @@ app.post("/webhook", async (req, res) => {
       userState[chatId] = null;
     }
 
-    // ==============================
-    // 🔥 扣點（完全依照你後台邏輯）
-    // ==============================
-
+    // ===== 扣點（完全修正）=====
     else if (userState[chatId]?.action === "USE_PHONE") {
-
-      const phone = text;
-
-      // 先查目前點數
-      const checkRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
-      const checkText = await checkRes.text();
-      const currentPoints = extractPoints(checkText);
 
       userState[chatId] = {
         action: "USE_POINTS",
-        phone: phone,
-        beforePoints: currentPoints
+        phone: text
       };
 
-      replyText = `目前點數：${currentPoints} 點\n請輸入要扣的點數`;
+      const checkRes = await fetch(`${GAS_URL}?action=check&phone=${text}`);
+      replyText = await checkRes.text();
     }
 
     else if (userState[chatId]?.action === "USE_POINTS") {
@@ -166,31 +145,18 @@ app.post("/webhook", async (req, res) => {
       } else {
 
         const phone = userState[chatId].phone;
-        const beforePoints = userState[chatId].beforePoints;
         const usePoints = parseInt(text);
 
-        if (usePoints > beforePoints) {
-          replyText = "點數不足";
-        } else {
+        const response = await fetch(
+          `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
+        );
 
-          const response = await fetch(
-            `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
-          );
-
-          const result = await response.text();
-          const remaining = extractPoints(result);
-
-          replyText =
-            `原本點數：${beforePoints} 點\n` +
-            `扣除：${usePoints} 點\n` +
-            `剩餘點數：${remaining} 點`;
-        }
+        replyText = await response.text();
       }
 
       userState[chatId] = null;
     }
 
-    // ===== 回傳 =====
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
