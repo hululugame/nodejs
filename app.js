@@ -30,6 +30,23 @@ app.post("/webhook", async (req, res) => {
 
     let replyText = "指令錯誤";
 
+// ===== 按鈕處理 =====
+if (text === "🔍 查詢點數") {
+  replyText = "請輸入手機號碼";
+}
+
+else if (text === "🎟 產生序號") {
+  replyText = "請直接輸入1~4位數字";
+}
+
+else if (text === "➕ 累積點數") {
+  replyText = "請輸入 /add 手機號碼 消費金額";
+}
+
+else if (text === "➖ 扣點") {
+  replyText = "請輸入 /use 手機號碼 點數";
+}
+
     // ===== /start =====
     if (text === "/start") {
       await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
