@@ -5,6 +5,7 @@ app.use(express.json());
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const GAS_URL = "https://script.google.com/macros/s/AKfycbwxyu1gCGvrWT5g0fX9X9co74u5cJM5pl9-NiS4koanV8EvsaSXCzI-YbuYVEVB4t0n/exec";
+const ADMIN_ID = "8345305737";
 
 if (!BOT_TOKEN) {
   console.log("❌ Missing BOT_TOKEN");
@@ -21,6 +22,9 @@ app.post("/webhook", async (req, res) => {
     const chatId = update?.message?.chat?.id;
     const text = update?.message?.text;
     
+    if (chatId.toString() !== ADMIN_ID) {
+  return res.sendStatus(200);
+}
     console.log("8345305737:", chatId);
 
     if (!chatId || !text) {
