@@ -1,5 +1,8 @@
 const express = require("express");
 const fetch = require("node-fetch");
+
+console.log("🔥 APP STARTED");
+
 const app = express();
 
 app.use(express.json());
