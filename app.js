@@ -8,11 +8,7 @@ const ADMIN_ID = "8345305737";
 
 const userState = {};
 
-function extractPoints(text) {
-  const match = text.match(/目前點數[:：]?\s*(\d+)/);
-  return match ? parseInt(match[1]) : 0;
-}
-
+// 首頁測試
 app.get("/", (req, res) => {
   res.send("Bot is running");
 });
@@ -50,15 +46,15 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // ===== 按鈕 =====
+    // ===== 按鈕操作 =====
     if (text === "🔍 查詢點數") {
       userState[chatId] = { action: "CHECK" };
-      replyText = "請輸入會員手機";
+      replyText = "請輸入會員手機或帳號";
     }
 
     else if (text === "🎟 產生序號") {
       userState[chatId] = { action: "GENERATE" };
-      replyText = "請輸入點數";
+      replyText = "請輸入要產生的點數";
     }
 
     else if (text === "➕ 累積點數") {
@@ -71,13 +67,16 @@ app.post("/webhook", async (req, res) => {
       replyText = "請輸入會員手機";
     }
 
-    // ===== 查詢 =====
+    // ===== 查詢會員 =====
     else if (userState[chatId]?.action === "CHECK") {
 
-      const res1 = await fetch(`${GAS_URL}?action=check&phone=${text}`);
-      const result = await res1.text();
+      const response = await fetch(`${GAS_URL}?action=check&phone=${text}`);
+      const result = (await response.text()).trim();
 
-      if (result.includes("查無") || result.includes("找不到")) {
+      if (
+        result.includes("目前點數：0") &&
+        result.includes("無紀錄")
+      ) {
         replyText = "查無此會員";
       } else {
         replyText = result;
@@ -92,8 +91,10 @@ app.post("/webhook", async (req, res) => {
       if (!/^\d+$/.test(text)) {
         replyText = "請輸入數字";
       } else {
-        const res1 = await fetch(`${GAS_URL}?action=generate&points=${text}&password=az20408`);
-        const code = await res1.text();
+        const response = await fetch(
+          `${GAS_URL}?action=generate&points=${text}&password=az20408`
+        );
+        const code = await response.text();
         replyText = `序號：${code}\n\n\`${code}\``;
       }
 
@@ -103,7 +104,11 @@ app.post("/webhook", async (req, res) => {
     // ===== 累積點數 =====
     else if (userState[chatId]?.action === "ADD_PHONE") {
 
-      userState[chatId] = { action: "ADD_AMOUNT", phone: text };
+      userState[chatId] = {
+        action: "ADD_AMOUNT",
+        phone: text
+      };
+
       replyText = "請輸入消費金額";
     }
 
@@ -115,12 +120,13 @@ app.post("/webhook", async (req, res) => {
 
         const phone = userState[chatId].phone;
         const amount = parseInt(text);
-        const reward = Math.floor(amount * 0.01);
 
-        await fetch(`${GAS_URL}?action=addPointsBy&phone=${phone}&amount=${reward}&password=az20408`);
+        // 直接交給 GAS 計算 1%
+        const response = await fetch(
+          `${GAS_URL}?action=addPointsByAmount&phone=${phone}&amount=${amount}&password=az20408`
+        );
 
-        const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
-        replyText = await afterRes.text();
+        replyText = await response.text();
       }
 
       userState[chatId] = null;
@@ -129,8 +135,12 @@ app.post("/webhook", async (req, res) => {
     // ===== 扣點 =====
     else if (userState[chatId]?.action === "USE_PHONE") {
 
-      userState[chatId] = { action: "USE_POINTS", phone: text };
-      replyText = "請輸入扣除點數";
+      userState[chatId] = {
+        action: "USE_POINTS",
+        phone: text
+      };
+
+      replyText = "請輸入要扣的點數";
     }
 
     else if (userState[chatId]?.action === "USE_POINTS") {
@@ -142,15 +152,18 @@ app.post("/webhook", async (req, res) => {
         const phone = userState[chatId].phone;
         const usePoints = parseInt(text);
 
-        await fetch(`${GAS_URL}?action=usePoints&phone=${phone}&points=${usePoints}&password=az20408`);
+        // 直接交給 GAS 扣點
+        const response = await fetch(
+          `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
+        );
 
-        const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
-        replyText = await afterRes.text();
+        replyText = await response.text();
       }
 
       userState[chatId] = null;
     }
 
+    // ===== 回傳訊息 =====
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -164,7 +177,7 @@ app.post("/webhook", async (req, res) => {
     res.sendStatus(200);
 
   } catch (err) {
-    console.log(err);
+    console.log("❌ webhook error:", err);
     res.sendStatus(200);
   }
 });
