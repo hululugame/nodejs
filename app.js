@@ -38,8 +38,7 @@ app.post("/webhook", async (req, res) => {
 
     let replyText = "指令錯誤";
     
-    // 📱 直接輸入手機號碼查詢
-if (/^09\d{8}$/.test(text)) {
+
   const phone = text;
 
   const response = await fetch(
@@ -73,6 +72,36 @@ if (text === "➖ 扣點") {
     // 🔍 查詢點數按鈕
 if (text === "🔍 查詢點數") {
   replyText = "請輸入手機號碼";
+}
+
+// ===== 這裡開始放狀態處理 =====
+
+// 查詢點數
+else if (userState[chatId]?.action === "CHECK") {
+
+  if (!/^09\d{8}$/.test(text)) {
+    replyText = "手機格式錯誤，請重新輸入";
+  } else {
+    const response = await fetch(
+      `${GAS_URL}?action=check&phone=${text}`
+    );
+    replyText = await response.text();
+    userState[chatId] = null;
+  }
+}
+
+// 產生序號
+else if (userState[chatId]?.action === "GENERATE") {
+
+  if (!/^\d{1,4}$/.test(text)) {
+    replyText = "請輸入1~4位數點數";
+  } else {
+    const response = await fetch(
+      `${GAS_URL}?action=generate&points=${text}&password=az20408`
+    );
+    replyText = await response.text();
+    userState[chatId] = null;
+  }
 }
 
 if (command === "/start") {
