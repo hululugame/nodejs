@@ -30,6 +30,27 @@ app.post("/webhook", async (req, res) => {
 
     let replyText = "指令錯誤";
 
+if (command === "/start") {
+  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text: "請選擇功能",
+      reply_markup: {
+        keyboard: [
+          ["🔍 查詢點數"],
+          ["🎟 產生序號"],
+          ["➕ 累積點數"],
+          ["➖ 扣點"]
+        ],
+        resize_keyboard: true
+      }
+    })
+  });
+
+  return res.sendStatus(200);
+}
     // 🔎 查詢點數
     if (command.startsWith("/check") && parts[1]) {
       const phone = parts[1];
