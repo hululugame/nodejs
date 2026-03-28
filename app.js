@@ -118,7 +118,7 @@ if (command === "/start") {
     }
     
     // 🎟 直接輸入數字當成產生序號
-if (/^\d+$/.test(text)) {
+else if (/^\d+$/.test(text)) {
   const points = text;
 
   const response = await fetch(
