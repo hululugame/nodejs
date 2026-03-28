@@ -7,6 +7,8 @@ const BOT_TOKEN = process.env.BOT_TOKEN;
 const GAS_URL = "https://script.google.com/macros/s/AKfycbwxyu1gCGvrWT5g0fX9X9co74u5cJM5pl9-NiS4koanV8EvsaSXCzI-YbuYVEVB4t0n/exec";
 const ADMIN_ID = "8345305737";
 
+const userState = {};
+
 if (!BOT_TOKEN) {
   console.log("❌ Missing BOT_TOKEN");
 }
