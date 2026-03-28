@@ -36,6 +36,17 @@ app.post("/webhook", async (req, res) => {
 
     let replyText = "指令錯誤";
     
+    // 📱 直接輸入手機號碼查詢
+if (/^09\d{8}$/.test(text)) {
+  const phone = text;
+
+  const response = await fetch(
+    `${GAS_URL}?action=check&phone=${phone}`
+  );
+
+  replyText = await response.text();
+}
+    
     
 // 🔍 查詢點數按鈕
 if (text === "🔍 查詢點數") {
