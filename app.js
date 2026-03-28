@@ -28,7 +28,7 @@ app.post("/webhook", async (req, res) => {
     if (!chatId || !text) return;
 
     const parts = text.split(" ");
-    const command = parts[0];
+    const command = parts[0].split("@")[0];
 
     let replyText = "指令錯誤";
 
