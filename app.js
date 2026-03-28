@@ -1,10 +1,4 @@
-app.get("/", (req, res) => {
-  res.send("Bot is running");
-});
-
 const express = require("express");
-
-console.log("🔥 APP STARTED");
 
 const app = express();
 
@@ -95,7 +89,12 @@ app.post("/webhook", async (req, res) => {
   }
 });
 
+app.get("/", (req, res) => {
+  res.send("Bot is running");
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
+  console.log("🔥 APP STARTED");
   console.log("Server running");
 });
