@@ -12,6 +12,11 @@ app.get("/", (req, res) => {
   res.send("Bot is running");
 });
 
+function extractPoints(text) {
+  const match = text.match(/目前點數[:：]\s*(\d+)/);
+  return match ? parseInt(match[1]) : 0;
+}
+
 app.post("/webhook", async (req, res) => {
   try {
     const update = req.body;
@@ -22,6 +27,7 @@ app.post("/webhook", async (req, res) => {
     if (chatId.toString() !== ADMIN_ID) return res.sendStatus(200);
 
     let replyText = "指令錯誤";
+    let parseMode = undefined;
 
     // ===== /start =====
     if (text === "/start") {
@@ -68,29 +74,31 @@ app.post("/webhook", async (req, res) => {
 
     // ===== 查詢 =====
     else if (userState[chatId]?.action === "CHECK") {
-
       const response = await fetch(`${GAS_URL}?action=check&phone=${text}`);
       replyText = await response.text();
-
       userState[chatId] = null;
     }
 
-    // ===== 產生序號（修正重複問題）=====
+    // ===== 產生序號（可一鍵複製）=====
     else if (userState[chatId]?.action === "GENERATE") {
 
       if (!/^\d+$/.test(text)) {
         replyText = "請輸入數字";
       } else {
-
         const response = await fetch(
           `${GAS_URL}?action=generate&points=${text}&password=az20408`
         );
-
         const result = await response.text();
 
+        const codeMatch = result.match(/[A-Z0-9]{6,}/);
+        const code = codeMatch ? codeMatch[0] : result;
+
         replyText =
-          `可複製序號👇\n\n` +
-          `${result}`;
+          `序號如下 👇\n\n` +
+          `\`${code}\`\n\n` +
+          `（點擊即可複製）`;
+
+        parseMode = "Markdown";
       }
 
       userState[chatId] = null;
@@ -126,16 +134,24 @@ app.post("/webhook", async (req, res) => {
       userState[chatId] = null;
     }
 
-    // ===== 扣點（完全修正）=====
+    // ===== 扣點 =====
     else if (userState[chatId]?.action === "USE_PHONE") {
+
+      const phone = text;
+
+      const checkRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
+      const checkText = await checkRes.text();
+      const currentPoints = extractPoints(checkText);
 
       userState[chatId] = {
         action: "USE_POINTS",
-        phone: text
+        phone: phone,
+        beforePoints: currentPoints
       };
 
-      const checkRes = await fetch(`${GAS_URL}?action=check&phone=${text}`);
-      replyText = await checkRes.text();
+      replyText =
+        `目前點數：${currentPoints} 點\n\n` +
+        `請輸入要扣的點數`;
     }
 
     else if (userState[chatId]?.action === "USE_POINTS") {
@@ -145,13 +161,24 @@ app.post("/webhook", async (req, res) => {
       } else {
 
         const phone = userState[chatId].phone;
+        const beforePoints = userState[chatId].beforePoints;
         const usePoints = parseInt(text);
 
-        const response = await fetch(
-          `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
-        );
+        if (usePoints > beforePoints) {
+          replyText = "點數不足";
+        } else {
 
-        replyText = await response.text();
+          await fetch(
+            `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
+          );
+
+          const remaining = beforePoints - usePoints;
+
+          replyText =
+            `原本點數：${beforePoints} 點\n` +
+            `扣除：${usePoints} 點\n` +
+            `剩餘點數：${remaining} 點`;
+        }
       }
 
       userState[chatId] = null;
@@ -162,7 +189,8 @@ app.post("/webhook", async (req, res) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: chatId,
-        text: replyText
+        text: replyText,
+        parse_mode: parseMode
       }),
     });
 
