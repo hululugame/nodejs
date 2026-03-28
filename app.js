@@ -51,90 +51,31 @@ app.post("/webhook", async (req, res) => {
       return res.sendStatus(200);
     }
 
-    // ===== 按鈕 =====
+    // ===== 查詢點數 =====
     if (text === "🔍 查詢點數") {
       userState[chatId] = { action: "CHECK" };
       replyText = "請輸入會員手機或帳號";
     }
 
-    else if (text === "🎟 產生序號") {
-      userState[chatId] = { action: "GENERATE" };
-      replyText = "請輸入要產生的點數";
+    else if (userState[chatId]?.action === "CHECK") {
+      const response = await fetch(`${GAS_URL}?action=check&phone=${text}`);
+      const result = await response.text();
+
+      if (result.includes("目前點數：0") && result.includes("無紀錄")) {
+        replyText = "查無此會員";
+      } else {
+        replyText = result;
+      }
+
+      userState[chatId] = null;
     }
 
-    else if (text === "➕ 累積點數") {
-      userState[chatId] = { action: "ADD_PHONE" };
-      replyText = "請輸入會員手機";
-    }
-
+    // ===== 扣點開始 =====
     else if (text === "➖ 扣點") {
       userState[chatId] = { action: "USE_PHONE" };
       replyText = "請輸入會員手機";
     }
 
-    // ===== 查詢 =====
-    else if (userState[chatId]?.action === "CHECK") {
-      const response = await fetch(`${GAS_URL}?action=check&phone=${text}`);
-      replyText = await response.text();
-      userState[chatId] = null;
-    }
-
-    // ===== 產生序號（可一鍵複製）=====
-    else if (userState[chatId]?.action === "GENERATE") {
-
-      if (!/^\d+$/.test(text)) {
-        replyText = "請輸入數字";
-      } else {
-        const response = await fetch(
-          `${GAS_URL}?action=generate&points=${text}&password=az20408`
-        );
-        const result = await response.text();
-
-        const codeMatch = result.match(/[A-Z0-9]{6,}/);
-        const code = codeMatch ? codeMatch[0] : result;
-
-        replyText =
-          `序號如下 👇\n\n` +
-          `\`${code}\`\n\n` +
-          `（點擊即可複製）`;
-
-        parseMode = "Markdown";
-      }
-
-      userState[chatId] = null;
-    }
-
-    // ===== 累積點數 =====
-    else if (userState[chatId]?.action === "ADD_PHONE") {
-
-      userState[chatId] = {
-        action: "ADD_AMOUNT",
-        phone: text
-      };
-
-      replyText = "請輸入消費金額";
-    }
-
-    else if (userState[chatId]?.action === "ADD_AMOUNT") {
-
-      if (!/^\d+$/.test(text)) {
-        replyText = "請輸入正確金額";
-      } else {
-
-        const phone = userState[chatId].phone;
-        const amount = parseInt(text);
-
-        const response = await fetch(
-          `${GAS_URL}?action=addPointsByAmount&phone=${phone}&amount=${amount}&password=az20408`
-        );
-
-        replyText = await response.text();
-      }
-
-      userState[chatId] = null;
-    }
-
-    // ===== 扣點 =====
     else if (userState[chatId]?.action === "USE_PHONE") {
 
       const phone = text;
@@ -145,8 +86,7 @@ app.post("/webhook", async (req, res) => {
 
       userState[chatId] = {
         action: "USE_POINTS",
-        phone: phone,
-        beforePoints: currentPoints
+        phone: phone
       };
 
       replyText =
@@ -161,31 +101,21 @@ app.post("/webhook", async (req, res) => {
       } else {
 
         const phone = userState[chatId].phone;
-        const beforePoints = userState[chatId].beforePoints;
         const usePoints = parseInt(text);
 
-        if (usePoints > beforePoints) {
-          replyText = "點數不足";
-        } else {
+        // 🔥 真的扣點（寫入試算表）
+        await fetch(
+          `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
+        );
 
-          await fetch(
-            `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
-          );
+        // 🔥 再重新抓最新點數（確保同步）
+        const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
+        const afterText = await afterRes.text();
+        const newPoints = extractPoints(afterText);
 
-          await fetch(
-  `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
-);
-
-// 🔥 重新查詢最新點數（真正同步）
-const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
-const afterText = await afterRes.text();
-const newPoints = extractPoints(afterText);
-
-replyText =
-  `原本點數：${beforePoints} 點\n` +
-  `扣除：${usePoints} 點\n` +
-  `剩餘點數：${newPoints} 點`;
-        }
+        replyText =
+          `扣除：${usePoints} 點\n` +
+          `剩餘點數：${newPoints} 點`;
       }
 
       userState[chatId] = null;
