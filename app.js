@@ -1,52 +1,90 @@
 const express = require("express");
-
 const app = express();
 
-// 一定要有：不然收不到 Telegram 的 JSON body
 app.use(express.json());
 
-const BOT_TOKEN = process.env.BOT_TOKEN; // 你要在 Railway Variables 設
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const GAS_URL = "https://script.google.com/macros/s/AKfycbwxyu1gCGvrWT5g0fX9X9co74u5cJM5pl9-NiS4koanV8EvsaSXCzI-YbuYVEVB4t0n/exec";
+
 if (!BOT_TOKEN) {
-  console.log("❌ Missing BOT_TOKEN in environment variables");
+  console.log("❌ Missing BOT_TOKEN");
 }
 
-// 測試首頁（用瀏覽器開這個網址應該要看到 OK）
 app.get("/", (req, res) => {
-  res.status(200).send("OK");
+  res.send("OK");
 });
 
-// Telegram webhook：Telegram 只會用 POST 打這裡
 app.post("/webhook", async (req, res) => {
   try {
     const update = req.body;
-    console.log("✅ update:", JSON.stringify(update));
-
-    // 先立刻回 200，不然 Telegram 會重送
     res.sendStatus(200);
 
-    // 只處理文字訊息
     const chatId = update?.message?.chat?.id;
     const text = update?.message?.text;
 
     if (!chatId || !text) return;
 
-    const replyText = `收到：${text}`;
+    const parts = text.split(" ");
+    const command = parts[0];
 
-    // 呼叫 Telegram sendMessage
+    let replyText = "指令錯誤";
+
+    // 🔎 查詢點數
+    if (command === "/check" && parts[1]) {
+      const phone = parts[1];
+
+      const response = await fetch(
+        `${GAS_URL}?action=check&phone=${phone}`
+      );
+      replyText = await response.text();
+    }
+
+    // 🎟 產生序號
+    else if (command === "/generate" && parts[1]) {
+      const points = parts[1];
+
+      const response = await fetch(
+        `${GAS_URL}?action=generate&points=${points}&password=az20408`
+      );
+      replyText = await response.text();
+    }
+
+    // ➕ 累積點數
+    else if (command === "/add" && parts[1] && parts[2]) {
+      const phone = parts[1];
+      const amount = parts[2];
+
+      const response = await fetch(
+        `${GAS_URL}?action=addPointsBy&phone=${phone}&amount=${amount}&password=az20408`
+      );
+      replyText = await response.text();
+    }
+
+    // ➖ 扣點
+    else if (command === "/use" && parts[1] && parts[2]) {
+      const phone = parts[1];
+      const points = parts[2];
+
+      const response = await fetch(
+        `${GAS_URL}?action=usePoints&phone=${phone}&points=${points}&password=az20408`
+      );
+      replyText = await response.text();
+    }
+
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: chatId, text: replyText }),
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: replyText,
+      }),
     });
-
-    console.log("✅ replied to chat:", chatId);
   } catch (err) {
-    console.log("❌ webhook error:", err);
-    // 這裡不要卡住
+    console.log("❌ error:", err);
   }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("Server running on port", PORT);
+  console.log("Server running");
 });
