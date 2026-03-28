@@ -142,20 +142,26 @@ else if (userState[chatId]?.action === "USE_PHONE") {
 
   const phone = text;
 
-  // 🔥 先查目前點數
+  // 先查目前點數
   const checkRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
   const checkText = await checkRes.text();
   const currentPoints = extractPoints(checkText);
 
-  userState[chatId] = {
-    action: "USE_POINTS",
-    phone: phone,
-    beforePoints: currentPoints
-  };
+  if (currentPoints === null) {
+    replyText = "查無此會員";
+    userState[chatId] = null;
+  } else {
 
-  replyText =
-    `目前點數：${currentPoints} 點\n` +
-    `請輸入要扣除的點數`;
+    userState[chatId] = {
+      action: "USE_POINTS",
+      phone: phone,
+      beforePoints: currentPoints
+    };
+
+    replyText =
+      `目前點數：${currentPoints} 點\n` +
+      `請輸入要扣除的點數`;
+  }
 }
 
 else if (userState[chatId]?.action === "USE_POINTS") {
@@ -172,12 +178,12 @@ else if (userState[chatId]?.action === "USE_POINTS") {
       replyText = "點數不足";
     } else {
 
-      // 🔥 交給 GAS 扣點（寫回試算表）
+      // ✅ 正確參數名稱改這裡
       await fetch(
-        `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
+        `${GAS_URL}?action=redeemPoints&phone=${phone}&points=${usePoints}&password=az20408`
       );
 
-      // 🔥 再查一次確保同步
+      // 再查一次最新點數
       const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
       const afterText = await afterRes.text();
       const newPoints = extractPoints(afterText);
