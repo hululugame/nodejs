@@ -38,51 +38,68 @@ app.post("/webhook", async (req, res) => {
 
     let replyText = "指令錯誤";
     
-    // 🔍 查詢點數按鈕
-if (text === "🔍 查詢點數") {
-  userState[chatId] = { action: "CHECK" };
-  replyText = "請輸入手機號碼";
-}
-
-// 🎟 產生序號按鈕
-else if (text === "🎟 產生序號") {
-  userState[chatId] = { action: "GENERATE" };
-  replyText = "請輸入點數";
-}
-
-  const phone = text;
+// ===== 查詢手機號碼 (一定要10碼09開頭) =====
+if (/^09\d{8}$/.test(text)) {
 
   const response = await fetch(
-    `${GAS_URL}?action=check&phone=${phone}`
+    `${GAS_URL}?action=check&phone=${text}`
+  );
+
+  const result = await response.text();
+
+  if (!result || result.includes("查無")) {
+    replyText = "查無此手機資料";
+  } else {
+    replyText = result;
+  }
+}
+
+
+// ===== 產生序號 (只能1~4位數) =====
+else if (/^\d{1,4}$/.test(text)) {
+
+  const response = await fetch(
+    `${GAS_URL}?action=generate&points=${text}&password=az20408`
   );
 
   replyText = await response.text();
 }
-    
-    
-// 🔍 查詢點數按鈕
-if (text === "🔍 查詢點數") {
-  replyText = "請輸入手機號碼，例如：0912345678";
+
+
+// ===== 累積點數 =====
+else if (text.startsWith("/add ")) {
+
+  const parts = text.split(" ");
+  if (parts.length === 3) {
+
+    const phone = parts[1];
+    const amount = parseInt(parts[2]);
+    const points = Math.floor(amount * 0.01);
+
+    const response = await fetch(
+      `${GAS_URL}?action=addPointsBy&phone=${phone}&amount=${points}&password=az20408`
+    );
+
+    replyText = await response.text();
+  }
 }
 
-// 🎟 產生序號
-if (text === "🎟 產生序號") {
-  replyText = "請輸入點數，例如：/generate 50";
-}
 
-// ➕ 累積點數
-if (text === "➕ 累積點數") {
-  replyText = "請輸入 /add 手機號碼 點數";
-}
+// ===== 扣點 =====
+else if (text.startsWith("/use ")) {
 
-// ➖ 扣點
-if (text === "➖ 扣點") {
-  replyText = "請輸入 /use 手機號碼 點數";
-}
+  const parts = text.split(" ");
+  if (parts.length === 3) {
 
-    // 🔍 查詢點數按鈕
-if (text === "🔍 查詢點數") {
-  replyText = "請輸入手機號碼";
+    const phone = parts[1];
+    const points = parts[2];
+
+    const response = await fetch(
+      `${GAS_URL}?action=usePoints&phone=${phone}&points=${points}&password=az20408`
+    );
+
+    replyText = await response.text();
+  }
 }
 
 // ===== 這裡開始放狀態處理 =====
