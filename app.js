@@ -36,6 +36,10 @@ app.post("/webhook", async (req, res) => {
     if (command.startsWith("/check") && parts[1]) {
       const phone = parts[1];
 
+
+      console.log("收到 check 指令:", phone);
+    
+    
       const response = await fetch(
         `${GAS_URL}?action=check&phone=${phone}`
       );
