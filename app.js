@@ -9,7 +9,7 @@ const ADMIN_ID = "8345305737";
 const userState = {};
 
 function extractPoints(text) {
-  const match = text.match(/目前點數[:：]?\s*(\d+)/);
+  const match = text.match(/目前點數[:：]\s*(\d+)/);
   return match ? parseInt(match[1]) : null;
 }
 
@@ -71,13 +71,17 @@ app.post("/webhook", async (req, res) => {
       replyText = "請輸入會員手機";
     }
 
-    // ===== 查詢 =====
+    // ===== 查詢會員 =====
     else if (userState[chatId]?.action === "CHECK") {
 
       const response = await fetch(`${GAS_URL}?action=check&phone=${text}`);
       const result = (await response.text()).trim();
+      const points = extractPoints(result);
 
-      if (result.includes("目前點數：0") && result.includes("無紀錄")) {
+      if (
+        result.includes("目前點數：0") &&
+        result.includes("無紀錄")
+      ) {
         replyText = "查無此會員";
       } else {
         replyText = result;
@@ -96,6 +100,7 @@ app.post("/webhook", async (req, res) => {
           `${GAS_URL}?action=generate&points=${text}&password=az20408`
         );
         const code = await response.text();
+
         replyText = `序號：${code}\n\n\`${code}\``;
       }
 
@@ -105,7 +110,11 @@ app.post("/webhook", async (req, res) => {
     // ===== 累積點數 =====
     else if (userState[chatId]?.action === "ADD_PHONE") {
 
-      userState[chatId] = { action: "ADD_AMOUNT", phone: text };
+      userState[chatId] = {
+        action: "ADD_AMOUNT",
+        phone: text
+      };
+
       replyText = "請輸入消費金額";
     }
 
@@ -119,26 +128,20 @@ app.post("/webhook", async (req, res) => {
         const amount = parseInt(text);
         const reward = Math.floor(amount * 0.01);
 
-        // 先查原本點數
-        const beforeRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
-        const beforeText = await beforeRes.text();
-        const beforePoints = extractPoints(beforeText) || 0;
-
-        // 加點
+        // 只讓 GAS 加 reward
         await fetch(
           `${GAS_URL}?action=addPointsBy&phone=${phone}&amount=${reward}&password=az20408`
         );
 
-        // 再查最新
+        // 再查最新總點數
         const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
         const afterText = await afterRes.text();
         const newPoints = extractPoints(afterText);
 
         replyText =
-          `原本點數：${beforePoints} 點\n` +
           `消費 ${amount} 元\n` +
           `回饋 ${reward} 點\n\n` +
-          `目前總點數：${newPoints} 點`;
+          `目前總點數：${newPoints ?? 0} 點`;
       }
 
       userState[chatId] = null;
@@ -147,7 +150,11 @@ app.post("/webhook", async (req, res) => {
     // ===== 扣點 =====
     else if (userState[chatId]?.action === "USE_PHONE") {
 
-      userState[chatId] = { action: "USE_POINTS", phone: text };
+      userState[chatId] = {
+        action: "USE_POINTS",
+        phone: text
+      };
+
       replyText = "請輸入要扣的點數";
     }
 
@@ -160,24 +167,24 @@ app.post("/webhook", async (req, res) => {
         const phone = userState[chatId].phone;
         const usePoints = parseInt(text);
 
-        // 先查原本點數
         const beforeRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
         const beforeText = await beforeRes.text();
         const beforePoints = extractPoints(beforeText);
 
         if (beforePoints === null) {
           replyText = "查無此會員";
-        }
+        } 
         else if (usePoints > beforePoints) {
           replyText = "點數不足";
-        }
+        } 
         else {
 
+          // 讓 GAS 扣點
           await fetch(
             `${GAS_URL}?action=usePoints&phone=${phone}&points=${usePoints}&password=az20408`
           );
 
-          // 再查最新點數
+          // 再查一次最新點數（避免 #NUM!）
           const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
           const afterText = await afterRes.text();
           const newPoints = extractPoints(afterText);
@@ -185,7 +192,7 @@ app.post("/webhook", async (req, res) => {
           replyText =
             `原本點數：${beforePoints} 點\n` +
             `扣除：${usePoints} 點\n` +
-            `剩餘點數：${newPoints} 點`;
+            `剩餘點數：${newPoints ?? 0} 點`;
         }
       }
 
