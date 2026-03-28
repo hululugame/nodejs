@@ -20,6 +20,8 @@ app.post("/webhook", async (req, res) => {
 
     const chatId = update?.message?.chat?.id;
     const text = update?.message?.text;
+    
+    console.log("8345305737:", chatId);
 
     if (!chatId || !text) {
       return res.sendStatus(200);
