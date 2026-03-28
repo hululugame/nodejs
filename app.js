@@ -33,7 +33,7 @@ app.post("/webhook", async (req, res) => {
     let replyText = "指令錯誤";
 
     // 🔎 查詢點數
-    if (command === "/check" && parts[1]) {
+    if (command.startsWith("/check") && parts[1]) {
       const phone = parts[1];
 
       const response = await fetch(
