@@ -172,12 +172,19 @@ app.post("/webhook", async (req, res) => {
             `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
           );
 
-          const remaining = beforePoints - usePoints;
+          await fetch(
+  `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
+);
 
-          replyText =
-            `原本點數：${beforePoints} 點\n` +
-            `扣除：${usePoints} 點\n` +
-            `剩餘點數：${remaining} 點`;
+// 🔥 重新查詢最新點數（真正同步）
+const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
+const afterText = await afterRes.text();
+const newPoints = extractPoints(afterText);
+
+replyText =
+  `原本點數：${beforePoints} 點\n` +
+  `扣除：${usePoints} 點\n` +
+  `剩餘點數：${newPoints} 點`;
         }
       }
 
