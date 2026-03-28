@@ -133,35 +133,59 @@ app.post("/webhook", async (req, res) => {
     }
 
     // ===== 扣點 =====
-    else if (userState[chatId]?.action === "USE_PHONE") {
+else if (userState[chatId]?.action === "USE_PHONE") {
 
-      userState[chatId] = {
-        action: "USE_POINTS",
-        phone: text
-      };
+  const phone = text;
 
-      replyText = "請輸入要扣的點數";
+  // 🔥 先查目前點數
+  const checkRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
+  const checkText = await checkRes.text();
+  const currentPoints = extractPoints(checkText);
+
+  userState[chatId] = {
+    action: "USE_POINTS",
+    phone: phone,
+    beforePoints: currentPoints
+  };
+
+  replyText =
+    `目前點數：${currentPoints} 點\n` +
+    `請輸入要扣除的點數`;
+}
+
+else if (userState[chatId]?.action === "USE_POINTS") {
+
+  if (!/^\d+$/.test(text)) {
+    replyText = "請輸入正確點數";
+  } else {
+
+    const phone = userState[chatId].phone;
+    const beforePoints = userState[chatId].beforePoints;
+    const usePoints = parseInt(text);
+
+    if (usePoints > beforePoints) {
+      replyText = "點數不足";
+    } else {
+
+      // 🔥 交給 GAS 扣點（寫回試算表）
+      await fetch(
+        `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
+      );
+
+      // 🔥 再查一次確保同步
+      const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
+      const afterText = await afterRes.text();
+      const newPoints = extractPoints(afterText);
+
+      replyText =
+        `原本點數：${beforePoints} 點\n` +
+        `扣除：${usePoints} 點\n` +
+        `剩餘點數：${newPoints} 點`;
     }
+  }
 
-    else if (userState[chatId]?.action === "USE_POINTS") {
-
-      if (!/^\d+$/.test(text)) {
-        replyText = "請輸入正確點數";
-      } else {
-
-        const phone = userState[chatId].phone;
-        const usePoints = parseInt(text);
-
-        // 直接交給 GAS 扣點
-        const response = await fetch(
-          `${GAS_URL}?action=redeemPoints&phone=${phone}&usePoints=${usePoints}&password=az20408`
-        );
-
-        replyText = await response.text();
-      }
-
-      userState[chatId] = null;
-    }
+  userState[chatId] = null;
+}
 
     // ===== 回傳訊息 =====
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
