@@ -1,4 +1,5 @@
 const express = require("express");
+const fetch = require("node-fetch");
 
 const app = express();
 app.use(express.json());
@@ -9,10 +10,6 @@ const ADMIN_ID = "8345305737";
 
 const userState = {};
 
-if (!BOT_TOKEN) {
-  console.log("❌ Missing BOT_TOKEN");
-}
-
 app.get("/", (req, res) => {
   res.send("Bot is running");
 });
@@ -20,137 +17,128 @@ app.get("/", (req, res) => {
 app.post("/webhook", async (req, res) => {
   try {
     const update = req.body;
-
     const chatId = update?.message?.chat?.id;
     const text = update?.message?.text;
-    
-    if (chatId.toString() !== ADMIN_ID) {
-  return res.sendStatus(200);
-}
-    console.log("8345305737:", chatId);
 
-    if (!chatId || !text) {
+    if (!chatId || !text) return res.sendStatus(200);
+
+    if (chatId.toString() !== ADMIN_ID) {
       return res.sendStatus(200);
     }
 
-    const parts = text.split(" ");
-    const command = parts[0].split("@")[0];
-
     let replyText = "指令錯誤";
-    
-    // 📱 直接輸入手機號碼查詢
-if (/^09\d{8}$/.test(text)) {
-  const phone = text;
 
-  const response = await fetch(
-    `${GAS_URL}?action=check&phone=${phone}`
-  );
-
-  replyText = await response.text();
-}
-    
-    
-// 🔍 查詢點數按鈕
-if (text === "🔍 查詢點數") {
-  replyText = "請輸入手機號碼，例如：0912345678";
-}
-
-// 🎟 產生序號
-if (text === "🎟 產生序號") {
-  replyText = "請輸入點數，例如：/generate 50";
-}
-
-// ➕ 累積點數
-if (text === "➕ 累積點數") {
-  replyText = "請輸入 /add 手機號碼 點數";
-}
-
-// ➖ 扣點
-if (text === "➖ 扣點") {
-  replyText = "請輸入 /use 手機號碼 點數";
-}
-
-    // 🔍 查詢點數按鈕
-if (text === "🔍 查詢點數") {
-  replyText = "請輸入手機號碼";
-}
-
-if (command === "/start") {
-  await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text: "請選擇功能",
-      reply_markup: {
-        keyboard: [
-          ["🔍 查詢點數"],
-          ["🎟 產生序號"],
-          ["➕ 累積點數"],
-          ["➖ 扣點"]
-        ],
-        resize_keyboard: true
-      }
-    })
-  });
-
-  return res.sendStatus(200);
-}
-    // 🔎 查詢點數
-    if (command.startsWith("/check") && parts[1]) {
-      const phone = parts[1];
-      console.log("收到 check 指令:", phone);
-
-      const response = await fetch(
-        `${GAS_URL}?action=check&phone=${phone}`
-      );
-      replyText = await response.text();
+    // ====== START 鍵盤 ======
+    if (text === "/start") {
+      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: "請選擇功能",
+          reply_markup: {
+            keyboard: [
+              ["🔍 查詢點數"],
+              ["🎟 產生序號"],
+              ["➕ 累積點數"],
+              ["➖ 扣點"]
+            ],
+            resize_keyboard: true
+          }
+        })
+      });
+      return res.sendStatus(200);
     }
 
-    // 🎟 產生序號
-    else if (command === "/generate" && parts[1]) {
-      const points = parts[1];
+    // ====== 按鈕設定狀態 ======
 
-      const response = await fetch(
-        `${GAS_URL}?action=generate&points=${points}&password=az20408`
-      );
-      replyText = await response.text();
-    }
-    
-    // 🎟 直接輸入數字當成產生序號
-if (/^\d+$/.test(text)) {
-  const points = text;
-
-  const response = await fetch(
-    `${GAS_URL}?action=generate&points=${points}&password=az20408`
-  );
-
-  replyText = await response.text();
-}
-
-    // ➕ 累積點數
-    else if (command === "/add" && parts[1] && parts[2]) {
-      const phone = parts[1];
-      const amount = parts[2];
-
-      const response = await fetch(
-        `${GAS_URL}?action=addPointsBy&phone=${phone}&amount=${amount}&password=az20408`
-      );
-      replyText = await response.text();
+    if (text === "🔍 查詢點數") {
+      userState[chatId] = { action: "CHECK" };
+      replyText = "請輸入手機號碼";
     }
 
-    // ➖ 扣點
-    else if (command === "/use" && parts[1] && parts[2]) {
-      const phone = parts[1];
-      const points = parts[2];
-
-      const response = await fetch(
-        `${GAS_URL}?action=usePoints&phone=${phone}&points=${points}&password=az20408`
-      );
-      replyText = await response.text();
+    else if (text === "🎟 產生序號") {
+      userState[chatId] = { action: "GENERATE" };
+      replyText = "請輸入點數";
     }
 
-    // 回傳訊息給 Telegram
+    else if (text === "➕ 累積點數") {
+      userState[chatId] = { action: "ADD_PHONE" };
+      replyText = "請輸入客人手機號碼";
+    }
+
+    else if (text === "➖ 扣點") {
+      userState[chatId] = { action: "USE_PHONE" };
+      replyText = "請輸入客人手機號碼";
+    }
+
+    // ====== 查詢點數 ======
+    else if (userState[chatId]?.action === "CHECK" && /^09\d{8}$/.test(text)) {
+
+      const response = await fetch(
+        `${GAS_URL}?action=check&phone=${text}`
+      );
+
+      replyText = await response.text();
+      userState[chatId] = null;
+    }
+
+    // ====== 產生序號 ======
+    else if (userState[chatId]?.action === "GENERATE" && /^\d+$/.test(text)) {
+
+      const response = await fetch(
+        `${GAS_URL}?action=generate&points=${text}&password=az20408`
+      );
+
+      replyText = await response.text();
+      userState[chatId] = null;
+    }
+
+    // ====== 累積點數 ======
+    else if (userState[chatId]?.action === "ADD_PHONE" && /^09\d{8}$/.test(text)) {
+      userState[chatId] = {
+        action: "ADD_AMOUNT",
+        phone: text
+      };
+      replyText = "請輸入消費金額";
+    }
+
+    else if (userState[chatId]?.action === "ADD_AMOUNT" && /^\d+$/.test(text)) {
+
+      const phone = userState[chatId].phone;
+      const amount = parseInt(text);
+      const points = Math.floor(amount * 0.01);
+
+      const response = await fetch(
+        `${GAS_URL}?action=addPointsBy&phone=${phone}&amount=${points}&password=az20408`
+      );
+
+      replyText = `回饋 ${points} 點\n` + await response.text();
+      userState[chatId] = null;
+    }
+
+    // ====== 扣點 ======
+    else if (userState[chatId]?.action === "USE_PHONE" && /^09\d{8}$/.test(text)) {
+      userState[chatId] = {
+        action: "USE_AMOUNT",
+        phone: text
+      };
+      replyText = "請輸入要扣幾點";
+    }
+
+    else if (userState[chatId]?.action === "USE_AMOUNT" && /^\d+$/.test(text)) {
+
+      const phone = userState[chatId].phone;
+
+      const response = await fetch(
+        `${GAS_URL}?action=usePoints&phone=${phone}&points=${text}&password=az20408`
+      );
+
+      replyText = await response.text();
+      userState[chatId] = null;
+    }
+
+    // ====== 回傳訊息 ======
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -164,7 +152,7 @@ if (/^\d+$/.test(text)) {
 
   } catch (err) {
     console.log("❌ webhook error:", err);
-    res.sendStatus(200); // 就算錯誤也要回 200，避免 Railway 重啟
+    res.sendStatus(200);
   }
 });
 
@@ -172,5 +160,4 @@ const PORT = process.env.PORT;
 
 app.listen(PORT, () => {
   console.log("🔥 APP STARTED");
-  console.log(`Server running on port ${PORT}`);
 });
