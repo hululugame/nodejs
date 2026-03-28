@@ -1,3 +1,7 @@
+app.get("/", (req, res) => {
+  res.send("Bot is running");
+});
+
 const express = require("express");
 
 console.log("🔥 APP STARTED");
