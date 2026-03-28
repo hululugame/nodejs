@@ -38,6 +38,17 @@ app.post("/webhook", async (req, res) => {
 
     let replyText = "指令錯誤";
     
+    // 🔍 查詢點數按鈕
+if (text === "🔍 查詢點數") {
+  userState[chatId] = { action: "CHECK" };
+  replyText = "請輸入手機號碼";
+}
+
+// 🎟 產生序號按鈕
+else if (text === "🎟 產生序號") {
+  userState[chatId] = { action: "GENERATE" };
+  replyText = "請輸入點數";
+}
 
   const phone = text;
 
