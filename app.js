@@ -82,13 +82,22 @@ else if (text === "➖ 扣點") {
 // ===== 查詢模式 =====
 else if (userState[chatId]?.action === "CHECK") {
 
+// ===== 查詢模式 =====
+else if (userState[chatId]?.action === "CHECK") {
+
   const response = await fetch(
     `${GAS_URL}?action=check&phone=${text}`
   );
 
-  const result = await response.text();
+  const result = (await response.text()).trim();
 
-  if (!result || result.includes("查無")) {
+  if (!result || result.length < 3) {
+    replyText = "查無此會員";
+  } else if (
+    result.includes("查無") ||
+    result.includes("not found") ||
+    result.includes("error")
+  ) {
     replyText = "查無此會員";
   } else {
     replyText = result;
