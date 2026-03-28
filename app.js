@@ -1,12 +1,14 @@
 const express = require('express');
 const app = express();
 
-const PORT = process.env.PORT || 3000;
+app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send('成功了！你的網站跑起來了 🚀');
+app.post('/', (req, res) => {
+  console.log(req.body);
+  res.send('ok');
 });
 
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log('running on port ' + PORT);
 });
