@@ -32,11 +32,13 @@ app.post("/webhook", async (req, res) => {
 
 // ===== 按鈕處理 =====
 if (text === "🔍 查詢點數") {
-  replyText = "請輸入手機號碼";
+  userState[chatId] = { action: "CHECK" };
+  replyText = "請輸入會員手機或帳號";
 }
 
 else if (text === "🎟 產生序號") {
-  replyText = "請直接輸入1~4位數字";
+  userState[chatId] = { action: "GENERATE" };
+  replyText = "請輸入點數數字";
 }
 
 else if (text === "➕ 累積點數") {
@@ -77,14 +79,41 @@ else if (text === "➖ 扣點") {
     }
 
     // ===== 產生序號 (只接受1~4位數) =====
-    else if (/^\d{1,4}$/.test(text)) {
+// ===== 查詢模式 =====
+else if (userState[chatId]?.action === "CHECK") {
 
-      const response = await fetch(
-        `${GAS_URL}?action=generate&points=${text}&password=az20408`
-      );
+  const response = await fetch(
+    `${GAS_URL}?action=check&phone=${text}`
+  );
 
-      replyText = await response.text();
-    }
+  const result = await response.text();
+
+  if (!result || result.includes("查無")) {
+    replyText = "查無此會員";
+  } else {
+    replyText = result;
+  }
+
+  userState[chatId] = null;
+}
+
+
+// ===== 產生序號模式 =====
+else if (userState[chatId]?.action === "GENERATE") {
+
+  if (!/^\d+$/.test(text)) {
+    replyText = "請輸入數字";
+  } else {
+
+    const response = await fetch(
+      `${GAS_URL}?action=generate&points=${text}&password=az20408`
+    );
+
+    replyText = await response.text();
+  }
+
+  userState[chatId] = null;
+}
 
     // ===== 累積點數 =====
     else if (text.startsWith("/add ")) {
