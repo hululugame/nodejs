@@ -13,6 +13,11 @@ app.get("/", (req, res) => {
   res.send("Bot is running");
 });
 
+function extractPoints(text) {
+  const match = text.match(/目前點數[:：]\s*(\d+)/);
+  return match ? parseInt(match[1]) : 0;
+}
+
 app.post("/webhook", async (req, res) => {
   try {
     const update = req.body;
