@@ -1,7 +1,6 @@
 const express = require("express");
 
 const app = express();
-
 app.use(express.json());
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
@@ -12,18 +11,19 @@ if (!BOT_TOKEN) {
 }
 
 app.get("/", (req, res) => {
-  res.send("OK");
+  res.send("Bot is running");
 });
 
 app.post("/webhook", async (req, res) => {
   try {
     const update = req.body;
-    res.sendStatus(200);
 
     const chatId = update?.message?.chat?.id;
     const text = update?.message?.text;
 
-    if (!chatId || !text) return;
+    if (!chatId || !text) {
+      return res.sendStatus(200);
+    }
 
     const parts = text.split(" ");
     const command = parts[0].split("@")[0];
@@ -33,11 +33,8 @@ app.post("/webhook", async (req, res) => {
     // 🔎 查詢點數
     if (command.startsWith("/check") && parts[1]) {
       const phone = parts[1];
-
-
       console.log("收到 check 指令:", phone);
-    
-    
+
       const response = await fetch(
         `${GAS_URL}?action=check&phone=${phone}`
       );
@@ -76,6 +73,7 @@ app.post("/webhook", async (req, res) => {
       replyText = await response.text();
     }
 
+    // 回傳訊息給 Telegram
     await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -84,17 +82,17 @@ app.post("/webhook", async (req, res) => {
         text: replyText,
       }),
     });
-  } catch (err) {
-    console.log("❌ error:", err);
-  }
-});
 
-app.get("/", (req, res) => {
-  res.send("Bot is running");
+    res.sendStatus(200);
+
+  } catch (err) {
+    console.log("❌ webhook error:", err);
+    res.sendStatus(200); // 就算錯誤也要回 200，避免 Railway 重啟
+  }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("🔥 APP STARTED");
-  console.log("Server running");
+  console.log("Server running on port", PORT);
 });
