@@ -8,6 +8,11 @@ const ADMIN_ID = "8345305737";
 
 const userState = {};
 
+function extractPoints(text) {
+  const match = text.match(/目前點數[:：]?\s*(\d+)/);
+  return match ? parseInt(match[1]) : null;
+}
+
 app.get("/", (req, res) => {
   res.send("Bot is running");
 });
@@ -53,7 +58,7 @@ app.post("/webhook", async (req, res) => {
 
     else if (text === "🎟 產生序號") {
       userState[chatId] = { action: "GENERATE" };
-      replyText = "請輸入點數";
+      replyText = "請輸入要產生的點數";
     }
 
     else if (text === "➕ 累積點數") {
@@ -66,7 +71,7 @@ app.post("/webhook", async (req, res) => {
       replyText = "請輸入會員手機";
     }
 
-    // ===== 查詢會員 =====
+    // ===== 查詢 =====
     else if (userState[chatId]?.action === "CHECK") {
 
       const response = await fetch(`${GAS_URL}?action=check&phone=${text}`);
@@ -90,7 +95,8 @@ app.post("/webhook", async (req, res) => {
         const response = await fetch(
           `${GAS_URL}?action=generate&points=${text}&password=az20408`
         );
-        replyText = await response.text();
+        const code = await response.text();
+        replyText = `序號：${code}\n\n\`${code}\``;
       }
 
       userState[chatId] = null;
@@ -105,25 +111,34 @@ app.post("/webhook", async (req, res) => {
 
     else if (userState[chatId]?.action === "ADD_AMOUNT") {
 
-      const phone = userState[chatId].phone;
-
       if (!/^\d+$/.test(text)) {
         replyText = "請輸入正確金額";
       } else {
 
+        const phone = userState[chatId].phone;
         const amount = parseInt(text);
         const reward = Math.floor(amount * 0.01);
 
-        // 讓 GAS 加點
+        // 先查原本點數
+        const beforeRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
+        const beforeText = await beforeRes.text();
+        const beforePoints = extractPoints(beforeText) || 0;
+
+        // 加點
         await fetch(
           `${GAS_URL}?action=addPointsBy&phone=${phone}&amount=${reward}&password=az20408`
         );
 
-        // 再查一次（不自己算）
+        // 再查最新
         const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
+        const afterText = await afterRes.text();
+        const newPoints = extractPoints(afterText);
+
         replyText =
-          `消費 ${amount} 元\n回饋 ${reward} 點\n\n` +
-          await afterRes.text();
+          `原本點數：${beforePoints} 點\n` +
+          `消費 ${amount} 元\n` +
+          `回饋 ${reward} 點\n\n` +
+          `目前總點數：${newPoints} 點`;
       }
 
       userState[chatId] = null;
@@ -138,24 +153,40 @@ app.post("/webhook", async (req, res) => {
 
     else if (userState[chatId]?.action === "USE_POINTS") {
 
-      const phone = userState[chatId].phone;
-
       if (!/^\d+$/.test(text)) {
         replyText = "請輸入正確點數";
       } else {
 
+        const phone = userState[chatId].phone;
         const usePoints = parseInt(text);
 
-        // 讓 GAS 扣點
-        await fetch(
-          `${GAS_URL}?action=usePoints&phone=${phone}&points=${usePoints}&password=az20408`
-        );
+        // 先查原本點數
+        const beforeRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
+        const beforeText = await beforeRes.text();
+        const beforePoints = extractPoints(beforeText);
 
-        // 再查一次（不自己算剩餘）
-        const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
-        replyText =
-          `扣除 ${usePoints} 點\n\n` +
-          await afterRes.text();
+        if (beforePoints === null) {
+          replyText = "查無此會員";
+        }
+        else if (usePoints > beforePoints) {
+          replyText = "點數不足";
+        }
+        else {
+
+          await fetch(
+            `${GAS_URL}?action=usePoints&phone=${phone}&points=${usePoints}&password=az20408`
+          );
+
+          // 再查最新點數
+          const afterRes = await fetch(`${GAS_URL}?action=check&phone=${phone}`);
+          const afterText = await afterRes.text();
+          const newPoints = extractPoints(afterText);
+
+          replyText =
+            `原本點數：${beforePoints} 點\n` +
+            `扣除：${usePoints} 點\n` +
+            `剩餘點數：${newPoints} 點`;
+        }
       }
 
       userState[chatId] = null;
@@ -166,7 +197,8 @@ app.post("/webhook", async (req, res) => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: chatId,
-        text: replyText
+        text: replyText,
+        parse_mode: "Markdown"
       }),
     });
 
