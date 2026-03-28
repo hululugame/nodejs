@@ -114,6 +114,17 @@ if (command === "/start") {
       );
       replyText = await response.text();
     }
+    
+    // 🎟 直接輸入數字當成產生序號
+if (/^\d+$/.test(text)) {
+  const points = text;
+
+  const response = await fetch(
+    `${GAS_URL}?action=generate&points=${points}&password=az20408`
+  );
+
+  replyText = await response.text();
+}
 
     // ➕ 累積點數
     else if (command === "/add" && parts[1] && parts[2]) {
