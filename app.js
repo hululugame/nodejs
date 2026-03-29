@@ -91,20 +91,20 @@ app.post("/webhook", async (req, res) => {
     }
 
     // ===== 產生序號 =====
-    else if (userState[chatId]?.action === "GENERATE") {
+else if (userState[chatId]?.action === "GENERATE") {
 
-      if (!/^\d+$/.test(text)) {
-        replyText = "請輸入數字";
-      } else {
-        const response = await fetch(
-          `${GAS_URL}?action=generate&points=${text}&password=az20408`
-        );
-const code = (await response.text()).trim();
-replyText = `${code}\n\n\`${code}\``;
-      }
+  if (!/^\d+(\.\d+)?$/.test(text)) {
+    replyText = "請輸入正確點數，例如：10 或 10.2";
+  } else {
+    const response = await fetch(
+      `${GAS_URL}?action=generate&points=${text}&password=az20408`
+    );
+    const code = (await response.text()).trim();
+    replyText = `${code}\n\n\`${code}\``;
+  }
 
-      userState[chatId] = null;
-    }
+  userState[chatId] = null;
+}
 
     // ===== 累積點數 =====
     else if (userState[chatId]?.action === "ADD_PHONE") {
