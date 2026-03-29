@@ -99,8 +99,8 @@ app.post("/webhook", async (req, res) => {
         const response = await fetch(
           `${GAS_URL}?action=generate&points=${text}&password=az20408`
         );
-        const code = await response.text();
-        replyText = `序號：${code}\n\n\`${code}\``;
+const code = (await response.text()).trim();
+replyText = `${code}\n\n\`${code}\``;
       }
 
       userState[chatId] = null;
